@@ -1,0 +1,100 @@
+{
+  "name": "Bharat Voice Assistant - Automated Form Filling",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "draft-application",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = items[0].json.body;\nconst user = body.user_profile;\nconst scheme = body.scheme;\n\n// Generate dynamic, context-specific draft stages\nconst draft_stages = [\n  `Stage 1: Document Upload & OCR. Upload your Aadhaar or Income Certificate. We will auto-fill your name (${user.name || 'Not Specified'}) and annual income (${user.annual_income || 'Not Specified'}).`,\n  `Stage 2: Review Pre-filled Form. Review all extracted details: Name: ${user.name}, State: ${user.state}, Income: ${user.annual_income}, Caste: ${user.caste_category || 'General'}.`,\n  `Stage 3: Auto-fill Official Portal. Click the Bookmarks Autofill Tool to login to ${scheme.source_url} and fill out the fields automatically.`\n];\n\nreturn [{\n  json: {\n    draft_stages,\n    user_profile: user,\n    scheme: scheme\n  }\n}];"
+      },
+      "id": "generate-stages",
+      "name": "Generate Stages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Browser Automation (Puppeteer / Playwright) simulation script for n8n code execution\n// This runs in n8n environments equipped with puppeteer to open the portal and fill the form\nconst profile = items[0].json.user_profile;\nconst scheme = items[0].json.scheme;\n\nconst puppeteerScript = `\nconst puppeteer = require('puppeteer');\n(async () => {\n  const browser = await puppeteer.launch({ headless: false });\n  const page = await browser.newPage();\n  \n  console.log('Navigating to portal:', '${scheme.source_url}');\n  await page.goto('${scheme.source_url}', { waitUntil: 'networkidle2' });\n  \n  // Step 1: Handle login if required\n  const loginButton = await page.$('a[href*=\"login\"], button[id*=\"login\"]');\n  if (loginButton) {\n    await loginButton.click();\n    await page.waitForNavigation({ waitUntil: 'networkidle2' });\n    // Prompt user / caseworker to log in or enter OTP manually\n    console.log('Caseworker: Please log in or enter OTP on the screen.');\n  }\n  \n  // Step 2: Navigate to registration / application form\n  await page.waitForSelector('input', { timeout: 60000 });\n  \n  // Step 3: Enter profile details dynamically\n  const nameInput = await page.$('input[name*=\"name\"], input[id*=\"name\"]');\n  if (nameInput) await nameInput.type('${profile.name || \"\"}');\n  \n  const incomeInput = await page.$('input[name*=\"income\"], input[id*=\"income\"]');\n  if (incomeInput) await incomeInput.type('${profile.annual_income || \"\"}');\n  \n  const stateInput = await page.$('select[name*=\"state\"], select[id*=\"state\"]');\n  if (stateInput) {\n    await stateInput.select('${profile.state || \"\"}');\n  }\n  \n  console.log('Form filling automation completed for current step.');\n})();\n`;\n\nreturn [{\n  json: {\n    ...items[0].json,\n    automation_script: puppeteerScript\n  }\n}];"
+      },
+      "id": "browser-automation",
+      "name": "Browser Automation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Generate Stages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Stages": {
+      "main": [
+        [
+          {
+            "node": "Browser Automation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Browser Automation": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "meta": null,
+  "pinData": {}
+}
