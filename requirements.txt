@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+motor
+google-generativeai
+httpx
+python-multipart
+python-dotenv
+# qdrant-client # Uncomment this if you have C++ build tools installed or are using Python 3.12
